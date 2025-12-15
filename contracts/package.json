@@ -1,0 +1,20 @@
+{
+  "name": "family-memory-capsule-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy:base-sepolia": "hardhat run --network baseSepolia scripts/deploy.ts",
+    "test": "hardhat test"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.21.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
