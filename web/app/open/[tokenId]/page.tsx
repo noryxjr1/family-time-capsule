@@ -8,6 +8,11 @@ import { decryptAesGcm } from "../../../lib/crypto";
 import { sha256Hex } from "../../../lib/hash";
 
 const gatewayUrl = (cid: string) => `https://gateway.pinata.cloud/ipfs/${cid}`;
+const gatewayFallbacks = (cid: string) => [
+  gatewayUrl(cid),
+  `https://ipfs.io/ipfs/${cid}`,
+  `https://cloudflare-ipfs.com/ipfs/${cid}`,
+];
 
 type MemoryRecord = {
   openAt: bigint;
@@ -61,9 +66,17 @@ export default function OpenMemory() {
   });
 
   const record = useMemo<MemoryRecord | null>(() => {
-    const data = recordResult.data as unknown as MemoryRecord | undefined;
-    if (!data) return null;
-    return data;
+    const tuple = recordResult.data as any;
+    if (!tuple) return null;
+    const [openAt, encryptedCid, mediaHash, ivB64, metaCid, creator] = tuple;
+    return {
+      openAt: openAt as bigint,
+      encryptedCid: encryptedCid as string,
+      mediaHash: mediaHash as `0x${string}`,
+      ivB64: ivB64 as string,
+      metaCid: metaCid as string,
+      creator: creator as `0x${string}`,
+    };
   }, [recordResult.data]);
   const tokenExists = record && record.creator !== "0x0000000000000000000000000000000000000000";
 
@@ -73,6 +86,7 @@ export default function OpenMemory() {
   const [decryptStatus, setDecryptStatus] = useState<string>("");
   const [mediaUrl, setMediaUrl] = useState<string>("");
   const [mediaType, setMediaType] = useState<string>("");
+  const [fetchLog, setFetchLog] = useState<string>("");
 
   useEffect(() => {
     const fetchMetadata = async () => {
@@ -95,17 +109,36 @@ export default function OpenMemory() {
 
   const handleDecrypt = async () => {
     if (!record) return;
+    if (!record.encryptedCid) {
+      setDecryptStatus("No encrypted CID found on-chain for this token.");
+      return;
+    }
     if (!keyInput.trim()) {
       setDecryptStatus("Enter the base64 decryption key");
       return;
     }
     try {
       setDecryptStatus("Fetching encrypted file from IPFS...");
-      const res = await fetch(gatewayUrl(record.encryptedCid));
-      if (!res.ok) {
-        throw new Error(`Failed to download encrypted file: ${res.status}`);
+      const gateways = gatewayFallbacks(record.encryptedCid);
+      let encryptedBuffer: ArrayBuffer | null = null;
+      const errors: string[] = [];
+      for (const url of gateways) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            errors.push(`${url} -> ${res.status}`);
+            continue;
+          }
+          encryptedBuffer = await res.arrayBuffer();
+          break;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "fetch error";
+          errors.push(`${url} -> ${msg}`);
+        }
       }
-      const encryptedBuffer = await res.arrayBuffer();
+      if (!encryptedBuffer) {
+        throw new Error(`Failed to fetch ciphertext from all gateways: ${errors.join(" | ")}`);
+      }
       const computedHash = await sha256Hex(encryptedBuffer);
       if (record.mediaHash && record.mediaHash.toLowerCase() !== computedHash.toLowerCase()) {
         throw new Error("Ciphertext hash mismatch. File may be corrupted.");
@@ -119,6 +152,7 @@ export default function OpenMemory() {
       setMediaUrl(url);
       setMediaType(mime);
       setDecryptStatus("Decrypted! Keep this page open to view/download.");
+      setFetchLog(errors.join(" | "));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown decrypt error";
       setDecryptStatus(message);
@@ -191,6 +225,7 @@ export default function OpenMemory() {
             Decrypt & View
           </button>
           {decryptStatus && <div className="status">{decryptStatus}</div>}
+          {fetchLog && <div className="notice">Gateway attempts: {fetchLog}</div>}
           {mediaUrl && (
             <div className="media-preview">
               {mediaType.startsWith("image") ? (
