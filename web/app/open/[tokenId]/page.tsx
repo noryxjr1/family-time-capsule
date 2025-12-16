@@ -34,6 +34,46 @@ type MemoryMetadata = {
   originalName?: string;
 };
 
+const inferMimeFromName = (name?: string) => {
+  if (!name) return "";
+  const ext = name.split(".").pop()?.toLowerCase();
+  if (!ext) return "";
+  const map: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    webp: "image/webp",
+    svg: "image/svg+xml",
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+    mkv: "video/x-matroska",
+    avi: "video/x-msvideo",
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    pdf: "application/pdf",
+  };
+  return map[ext] || "";
+};
+
+const extFromMime = (mime: string) => {
+  const map: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "image/svg+xml": "svg",
+    "video/mp4": "mp4",
+    "video/quicktime": "mov",
+    "video/x-matroska": "mkv",
+    "video/x-msvideo": "avi",
+    "audio/mpeg": "mp3",
+    "audio/wav": "wav",
+    "application/pdf": "pdf",
+  };
+  return map[mime] || "bin";
+};
+
 export default function OpenMemory() {
   const params = useParams();
   const tokenIdParam = Array.isArray(params?.tokenId) ? params?.tokenId[0] : params?.tokenId;
@@ -146,7 +186,7 @@ export default function OpenMemory() {
 
       setDecryptStatus("Decrypting...");
       const plainBuffer = await decryptAesGcm(keyInput.trim(), record.ivB64, encryptedBuffer);
-      const mime = metadata?.mimeType || "application/octet-stream";
+      const mime = metadata?.mimeType || inferMimeFromName(metadata?.originalName) || "application/octet-stream";
       const blob = new Blob([plainBuffer], { type: mime });
       const url = URL.createObjectURL(blob);
       setMediaUrl(url);
@@ -233,7 +273,14 @@ export default function OpenMemory() {
               ) : mediaType.startsWith("video") ? (
                 <video controls style={{ width: "100%" }} src={mediaUrl} />
               ) : (
-                <a className="button" href={mediaUrl} download>
+                <a
+                  className="button"
+                  href={mediaUrl}
+                  download={
+                    metadata?.originalName ||
+                    `memory-${tokenIdParam || "file"}.${extFromMime(mediaType || "application/octet-stream")}`
+                  }
+                >
                   Download file
                 </a>
               )}
