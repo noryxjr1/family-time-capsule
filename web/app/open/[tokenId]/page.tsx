@@ -74,6 +74,20 @@ const extFromMime = (mime: string) => {
   return map[mime] || "bin";
 };
 
+const detectMimeFromBytes = (data: ArrayBuffer): string => {
+  const bytes = new Uint8Array(data.slice(0, 12));
+  const startsWith = (arr: number[]) => arr.every((v, i) => bytes[i] === v);
+  if (startsWith([0x89, 0x50, 0x4e, 0x47])) return "image/png";
+  if (startsWith([0xff, 0xd8, 0xff])) return "image/jpeg";
+  if (startsWith([0x47, 0x49, 0x46, 0x38])) return "image/gif";
+  if (startsWith([0x52, 0x49, 0x46, 0x46]) && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50)
+    return "image/webp";
+  if (startsWith([0x25, 0x50, 0x44, 0x46])) return "application/pdf";
+  if (startsWith([0x00, 0x00, 0x00, 0x18]) || startsWith([0x00, 0x00, 0x00, 0x14])) return "video/mp4";
+  if (startsWith([0x66, 0x74, 0x79, 0x70])) return "video/mp4";
+  return "";
+};
+
 export default function OpenMemory() {
   const params = useParams();
   const tokenIdParam = Array.isArray(params?.tokenId) ? params?.tokenId[0] : params?.tokenId;
@@ -186,7 +200,12 @@ export default function OpenMemory() {
 
       setDecryptStatus("Decrypting...");
       const plainBuffer = await decryptAesGcm(keyInput.trim(), record.ivB64, encryptedBuffer);
-      const mime = metadata?.mimeType || inferMimeFromName(metadata?.originalName) || "application/octet-stream";
+      const detectedMime = detectMimeFromBytes(plainBuffer);
+      const mime =
+        metadata?.mimeType ||
+        detectedMime ||
+        inferMimeFromName(metadata?.originalName) ||
+        "application/octet-stream";
       const blob = new Blob([plainBuffer], { type: mime });
       const url = URL.createObjectURL(blob);
       setMediaUrl(url);
