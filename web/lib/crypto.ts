@@ -25,6 +25,23 @@ const importKey = async (keyB64: string, usages: KeyUsage[]) => {
   return subtle.importKey("raw", raw, { name: "AES-GCM" }, false, usages);
 };
 
+const toArrayBuffer = (input: ArrayBuffer | ArrayBufferLike | ArrayBufferView): ArrayBuffer => {
+  // Always return a fresh ArrayBuffer to avoid SharedArrayBuffer typing issues.
+  if (input instanceof ArrayBuffer) {
+    return input.slice(0);
+  }
+  if ((input as ArrayBufferView).buffer) {
+    const view = input as ArrayBufferView;
+    const copy = new Uint8Array(view.byteLength);
+    copy.set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
+    return copy.buffer;
+  }
+  const source = new Uint8Array(input as ArrayBufferLike);
+  const copy = new Uint8Array(source.byteLength);
+  copy.set(source);
+  return copy.buffer;
+};
+
 export const generateKeyB64 = () => {
   const cryptoObj = getCrypto();
   const bytes = new Uint8Array(32);
@@ -34,14 +51,15 @@ export const generateKeyB64 = () => {
 
 export const encryptAesGcm = async (
   keyB64: string,
-  plain: ArrayBuffer
+  plain: ArrayBuffer | ArrayBufferLike
 ): Promise<{ cipher: Uint8Array; ivB64: string; ciphertext: string }> => {
   const cryptoObj = getCrypto();
   const iv = new Uint8Array(12);
   cryptoObj.getRandomValues(iv);
   const key = await importKey(keyB64, ["encrypt"]);
-  const cipherBuffer = await cryptoObj.subtle.encrypt({ name: "AES-GCM", iv }, key, plain);
-  const cipher = new Uint8Array(cipherBuffer);
+  const plainBuffer = toArrayBuffer(plain);
+  const cipherBuffer = await cryptoObj.subtle.encrypt({ name: "AES-GCM", iv }, key, plainBuffer);
+  const cipher = new Uint8Array(cipherBuffer as ArrayBuffer);
   return { cipher, ivB64: toBase64(iv), ciphertext: toBase64(cipher) };
 };
 
@@ -53,7 +71,9 @@ export const decryptAesGcm = async (
   const subtle = getCrypto().subtle;
   const key = await importKey(keyB64, ["decrypt"]);
   const iv = fromBase64(ivB64);
-  const data =
-    typeof ciphertext === "string" ? fromBase64(ciphertext) : ciphertext instanceof ArrayBuffer ? new Uint8Array(ciphertext) : ciphertext;
-  return subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+  const dataBuffer =
+    typeof ciphertext === "string"
+      ? toArrayBuffer(fromBase64(ciphertext))
+      : toArrayBuffer(ciphertext as ArrayBuffer | ArrayBufferLike | ArrayBufferView);
+  return subtle.decrypt({ name: "AES-GCM", iv }, key, dataBuffer);
 };

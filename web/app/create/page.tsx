@@ -48,12 +48,21 @@ export default function CreateMemory() {
       setStatus("Encrypting file in-browser...");
       const key = generateKeyB64();
       setKeyB64(key);
-      const arrayBuffer = await file.arrayBuffer();
-      const { cipher, ivB64 } = await encryptAesGcm(key, arrayBuffer);
-      const mediaHash = await sha256Hex(cipher.buffer);
+      const arrayBuffer: ArrayBuffer = await file.arrayBuffer();
+      // Ensure a concrete ArrayBuffer copy (helps when target types get widened on Vercel).
+      const bufferCopy = new Uint8Array(arrayBuffer.byteLength);
+      bufferCopy.set(new Uint8Array(arrayBuffer));
+      const { cipher, ivB64 } = await encryptAesGcm(key, bufferCopy.buffer);
+      // Create a dedicated ArrayBuffer (avoids SharedArrayBuffer typing and keeps File/Blob happy)
+      const cipherCopy = new Uint8Array(cipher.byteLength);
+      cipherCopy.set(cipher);
+      const cipherArrayBuffer: ArrayBuffer = cipherCopy.buffer;
+      const mediaHash = await sha256Hex(cipherArrayBuffer);
 
       setStatus("Uploading encrypted file to Pinata...");
-      const encryptedFile = new File([cipher], `${file.name}.enc`, { type: file.type || "application/octet-stream" });
+      const encryptedFile = new File([cipherArrayBuffer], `${file.name}.enc`, {
+        type: file.type || "application/octet-stream",
+      });
       const fileForm = new FormData();
       fileForm.append("file", encryptedFile);
       const pinRes = await fetch("/api/pinata/upload", { method: "POST", body: fileForm });
