@@ -50,6 +50,15 @@ npm run dev
 ```
 Open `http://localhost:3000` in a browser with an injected wallet (MetaMask, Rabby, etc.) on **Base Sepolia**.
 
+### Base Mini App (Farcaster Frames vNext)
+- Install deps (already wired in `web/package.json`): `npm install`
+- Set `NEXT_PUBLIC_APP_URL` to your deployed origin (e.g. `https://your-app.vercel.app`)
+- Generate `accountAssociation` via Base Build preview tool and paste into `web/accountAssociation.json`
+  - https://www.base.dev/preview?tab=account
+- Deploy (Vercel recommended), then verify:
+  - Manifest: `https://your-app.vercel.app/.well-known/farcaster.json`
+  - Frame meta: view page HTML and confirm `<meta property="fc:frame" ...>`
+
 ## Flows
 - **Create:** `/create` → upload file → set unlock delay → optional allowlist → encrypt locally → upload ciphertext & metadata to Pinata → mint `mintMemory`.
 - **Open:** `/open/[tokenId]` → checks `records`, `canView`, `isOpen` → when unlocked & allowed, paste the base64 key to decrypt the IPFS ciphertext. Hash is verified against on-chain `mediaHash` before decrypting.
