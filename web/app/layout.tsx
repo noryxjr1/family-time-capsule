@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "../components/providers";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-const baseAppId = process.env.NEXT_PUBLIC_BASE_APP_ID ?? "REPLACE_ME_BASE_APP_ID";
+const baseAppId = process.env.NEXT_PUBLIC_BASE_APP_ID ?? "6942d351d19763ca26ddc3a3";
 
 const frame = {
   version: "1",
