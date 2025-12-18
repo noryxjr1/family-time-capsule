@@ -2,7 +2,7 @@ export default function Head() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
   const frame = {
-    version: "next",
+    version: "1",
     imageUrl: `${appUrl}/og-image.svg`,
     button: {
       title: "Open app",

@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const manifest = {
     accountAssociation,
     frame: {
-      version: "next",
+      version: "1",
       name: "Family Memory Capsule",
       homeUrl: origin,
       iconUrl: `${origin}/icon.svg`,
