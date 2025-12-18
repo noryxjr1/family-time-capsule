@@ -32,8 +32,8 @@ export async function GET(request: Request) {
       version: "1",
       name: "Family Memory Capsule",
       homeUrl: origin,
-      iconUrl: `${origin}/icon.svg`,
-      splashImageUrl: `${origin}/splash.svg`,
+      iconUrl: `${origin}/icon.png`,
+      splashImageUrl: `${origin}/splash.png`,
       splashBackgroundColor: "#ffffff",
     },
   };
