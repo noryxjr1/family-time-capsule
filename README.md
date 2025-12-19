@@ -41,6 +41,7 @@ NEXT_PUBLIC_CONTRACT_ADDRESS=0xYourDeployedContract
 NEXT_PUBLIC_CHAIN_ID=84532
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_BASE_APP_ID=your-base-app-id
+NEXT_PUBLIC_WC_PROJECT_ID=your-walletconnect-project-id
 ```
 
 Install & run:

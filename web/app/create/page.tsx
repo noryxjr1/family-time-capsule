@@ -18,7 +18,9 @@ export default function CreateMemory() {
   const { connect, connectors, status: connectStatus } = useConnect();
   const { disconnect } = useDisconnect();
   const { writeContractAsync, status: writeStatus } = useWriteContract();
-  const primaryConnector = connectors[0];
+  const injectedConnector = connectors.find((c) => c.id === "injected");
+  const wcConnector = connectors.find((c) => c.id === "walletConnect");
+  const preferredConnector = injectedConnector?.ready ? injectedConnector : wcConnector ?? connectors[0];
 
   const [file, setFile] = useState<File | null>(null);
   const [openDateTime, setOpenDateTime] = useState<string>(() =>
@@ -84,11 +86,18 @@ export default function CreateMemory() {
       const fileForm = new FormData();
       fileForm.append("file", encryptedFile);
       const pinRes = await fetch("/api/pinata/upload", { method: "POST", body: fileForm });
-      const pinJson = await pinRes.json();
-      if (!pinRes.ok) {
-        throw new Error(pinJson?.detail || pinJson?.error || "Pinata upload failed");
+      const pinText = await pinRes.text();
+      let pinJson: any;
+      try {
+        pinJson = JSON.parse(pinText);
+      } catch {
+        pinJson = { detail: pinText || "Pinata returned non-JSON response" };
       }
-      const encryptedCid = pinJson.cid as string;
+      if (!pinRes.ok) {
+        const detail = pinJson?.detail || pinJson?.error || pinRes.statusText || "Pinata upload failed";
+        throw new Error(detail);
+      }
+      const encryptedCid = (pinJson as any).cid as string;
       setEncryptedCid(encryptedCid);
 
       setStatus("Publishing metadata to Pinata...");
@@ -109,11 +118,18 @@ export default function CreateMemory() {
         new File([JSON.stringify(metadata, null, 2)], "metadata.json", { type: "application/json" })
       );
       const metaRes = await fetch("/api/pinata/upload", { method: "POST", body: metaForm });
-      const metaJson = await metaRes.json();
-      if (!metaRes.ok) {
-        throw new Error(metaJson?.detail || metaJson?.error || "Metadata upload failed");
+      const metaText = await metaRes.text();
+      let metaJson: any;
+      try {
+        metaJson = JSON.parse(metaText);
+      } catch {
+        metaJson = { detail: metaText || "Pinata returned non-JSON response" };
       }
-      const metaCid = metaJson.cid as string;
+      if (!metaRes.ok) {
+        const detail = metaJson?.detail || metaJson?.error || metaRes.statusText || "Metadata upload failed";
+        throw new Error(detail);
+      }
+      const metaCid = (metaJson as any).cid as string;
       setMetaCid(metaCid);
 
       const viewersList = viewers
@@ -157,8 +173,8 @@ export default function CreateMemory() {
       <button
         className="button"
         type="button"
-        disabled={connectStatus === "pending" || !primaryConnector}
-        onClick={() => primaryConnector && connect({ connector: primaryConnector })}
+        disabled={connectStatus === "pending" || !preferredConnector}
+        onClick={() => preferredConnector && connect({ connector: preferredConnector })}
       >
         {connectStatus === "pending" ? "Connecting..." : "Connect Wallet"}
       </button>
