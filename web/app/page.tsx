@@ -12,7 +12,7 @@ export default function Home() {
             </p>
             <div className="cta-row">
               <a className="button" href="/create">Create a capsule ↗</a>
-              <a className="button secondary" href="/open/1">Open with a token ID</a>
+              <a className="button secondary" href="/open">Browse capsules</a>
             </div>
             <div className="chips" style={{ marginTop: 14 }}>
               <div className="chip">Kid-friendly</div>
@@ -38,7 +38,7 @@ export default function Home() {
           <h3 className="section-title">Open with kids</h3>
           <p>Enter a token ID to reveal the moment when it’s time. Share the surprise with your children in a safe, private way.</p>
           <div className="cta-row" style={{ marginTop: 10 }}>
-            <a className="button secondary" href="/open/1">Try opening a capsule</a>
+            <a className="button secondary" href="/open">Browse capsule list</a>
           </div>
         </div>
       </div>
