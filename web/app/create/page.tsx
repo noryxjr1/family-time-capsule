@@ -8,7 +8,10 @@ import { generateKeyB64, encryptAesGcm } from "../../lib/crypto";
 import { sha256Hex } from "../../lib/hash";
 import { wagmiConfig } from "../../lib/wagmi";
 
-const daysToSeconds = (days: number) => Math.max(0, Math.floor(days * 24 * 60 * 60));
+const toLocalDateTimeValue = (date: Date) => {
+  const offset = date.getTimezoneOffset() * 60 * 1000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+};
 
 export default function CreateMemory() {
   const { address, isConnected } = useAccount();
@@ -18,7 +21,9 @@ export default function CreateMemory() {
   const primaryConnector = connectors[0];
 
   const [file, setFile] = useState<File | null>(null);
-  const [openDays, setOpenDays] = useState(1);
+  const [openDateTime, setOpenDateTime] = useState<string>(() =>
+    toLocalDateTimeValue(new Date(Date.now() + 24 * 60 * 60 * 1000))
+  );
   const [viewers, setViewers] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [txHash, setTxHash] = useState<string>("");
@@ -27,7 +32,12 @@ export default function CreateMemory() {
   const [encryptedCid, setEncryptedCid] = useState<string>("");
   const [metaCid, setMetaCid] = useState<string>("");
 
-  const openAt = useMemo(() => Math.floor(Date.now() / 1000) + daysToSeconds(openDays), [openDays]);
+  const openAt = useMemo(() => {
+    if (!openDateTime) return null;
+    const parsed = new Date(openDateTime);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return Math.floor(parsed.getTime() / 1000);
+  }, [openDateTime]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -41,6 +51,14 @@ export default function CreateMemory() {
     }
     if (!CONTRACT_ADDRESS) {
       setStatus("NEXT_PUBLIC_CONTRACT_ADDRESS is missing.");
+      return;
+    }
+    if (!openAt) {
+      setStatus("Select a valid open date and time.");
+      return;
+    }
+    if (openAt <= Math.floor(Date.now() / 1000)) {
+      setStatus("Open date/time must be in the future.");
       return;
     }
 
@@ -164,13 +182,12 @@ export default function CreateMemory() {
           required
         />
 
-        <label htmlFor="openDays">Open after (days)</label>
+        <label htmlFor="openDateTime">Open date & time</label>
         <input
-          id="openDays"
-          type="number"
-          min={0}
-          value={openDays}
-          onChange={(e) => setOpenDays(Number(e.target.value))}
+          id="openDateTime"
+          type="datetime-local"
+          value={openDateTime}
+          onChange={(e) => setOpenDateTime(e.target.value)}
         />
 
         <label htmlFor="viewers">Allowlist addresses (comma separated)</label>
