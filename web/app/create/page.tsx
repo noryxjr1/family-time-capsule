@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useAccount, useConnect, useDisconnect, useWriteContract } from "wagmi";
 import { waitForTransactionReceipt, readContract } from "wagmi/actions";
 import { CONTRACT_ADDRESS, MEMORY_ABI } from "../../lib/contract";
@@ -20,9 +20,11 @@ export default function CreateMemory() {
   const { writeContractAsync, status: writeStatus } = useWriteContract();
   const injectedConnector = connectors.find((c) => c.id === "injected");
   const wcConnector = connectors.find((c) => c.id === "walletConnect");
-  const preferredConnector = injectedConnector?.ready ? injectedConnector : wcConnector ?? connectors[0];
+  const [isMobile, setIsMobile] = useState(false);
 
   const [file, setFile] = useState<File | null>(null);
+  const [fileBuffer, setFileBuffer] = useState<ArrayBuffer | null>(null);
+  const [fileInfo, setFileInfo] = useState<{ name: string; type: string }>({ name: "", type: "" });
   const [openDateTime, setOpenDateTime] = useState<string>(() =>
     toLocalDateTimeValue(new Date(Date.now() + 24 * 60 * 60 * 1000))
   );
@@ -33,6 +35,13 @@ export default function CreateMemory() {
   const [keyB64, setKeyB64] = useState<string>("");
   const [encryptedCid, setEncryptedCid] = useState<string>("");
   const [metaCid, setMetaCid] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined") {
+      const ua = navigator.userAgent || "";
+      setIsMobile(/Android|iPhone|iPad|iPod|Mobile/i.test(ua));
+    }
+  }, []);
 
   const openAt = useMemo(() => {
     if (!openDateTime) return null;
@@ -68,10 +77,14 @@ export default function CreateMemory() {
       setStatus("Encrypting file in-browser...");
       const key = generateKeyB64();
       setKeyB64(key);
-      const arrayBuffer: ArrayBuffer = await file.arrayBuffer();
+      const sourceBuffer: ArrayBuffer =
+        fileBuffer ||
+        (() => {
+          throw new Error("File reference is unavailable. Please re-select the file.");
+        })();
       // Ensure a concrete ArrayBuffer copy (helps when target types get widened on Vercel).
-      const bufferCopy = new Uint8Array(arrayBuffer.byteLength);
-      bufferCopy.set(new Uint8Array(arrayBuffer));
+      const bufferCopy = new Uint8Array(sourceBuffer.byteLength);
+      bufferCopy.set(new Uint8Array(sourceBuffer));
       const { cipher, ivB64 } = await encryptAesGcm(key, bufferCopy.buffer);
       // Create a dedicated ArrayBuffer (avoids SharedArrayBuffer typing and keeps File/Blob happy)
       const cipherCopy = new Uint8Array(cipher.byteLength);
@@ -80,8 +93,8 @@ export default function CreateMemory() {
       const mediaHash = await sha256Hex(cipherArrayBuffer);
 
       setStatus("Uploading encrypted file to Pinata...");
-      const encryptedFile = new File([cipherArrayBuffer], `${file.name}.enc`, {
-        type: file.type || "application/octet-stream",
+      const encryptedFile = new File([cipherArrayBuffer], `${fileInfo.name || "memory"}.enc`, {
+        type: fileInfo.type || "application/octet-stream",
       });
       const fileForm = new FormData();
       fileForm.append("file", encryptedFile);
@@ -108,8 +121,8 @@ export default function CreateMemory() {
         encryptedCid,
         ivB64,
         mediaHash,
-        mimeType: file.type,
-        originalName: file.name,
+        mimeType: fileInfo.type,
+        originalName: fileInfo.name,
         createdAt: Date.now(),
       };
       const metaForm = new FormData();
@@ -170,14 +183,26 @@ export default function CreateMemory() {
       );
     }
     return (
-      <button
-        className="button"
-        type="button"
-        disabled={connectStatus === "pending" || !preferredConnector}
-        onClick={() => preferredConnector && connect({ connector: preferredConnector })}
-      >
-        {connectStatus === "pending" ? "Connecting..." : "Connect Wallet"}
-      </button>
+      <div className="cta-row" style={{ gap: 8 }}>
+        <button
+          className="button"
+          type="button"
+          disabled={connectStatus === "pending" || !injectedConnector}
+          onClick={() => injectedConnector && connect({ connector: injectedConnector })}
+        >
+          {connectStatus === "pending" ? "Connecting..." : "Browser Wallet (Chrome)"}
+        </button>
+        {wcConnector && (
+          <button
+            className="button secondary"
+            type="button"
+            disabled={connectStatus === "pending"}
+            onClick={() => connect({ connector: wcConnector })}
+          >
+            WalletConnect (Mobile/Base)
+          </button>
+        )}
+      </div>
     );
   };
 
@@ -194,7 +219,19 @@ export default function CreateMemory() {
           id="file"
           type="file"
           accept="image/*,video/*"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          onChange={async (e) => {
+            const selected = e.target.files?.[0] || null;
+            setFile(selected);
+            setFileBuffer(null);
+            if (!selected) return;
+            try {
+              const buf = await selected.arrayBuffer();
+              setFileBuffer(buf);
+              setFileInfo({ name: selected.name, type: selected.type });
+            } catch {
+              setStatus("Failed to read the selected file. Please choose it again.");
+            }
+          }}
           required
         />
 
